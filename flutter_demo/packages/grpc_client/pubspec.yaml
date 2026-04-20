@@ -1,0 +1,12 @@
+name: grpc_client
+description: >
+  gRPC client package. Replaces the stdio-flags + WebSocket dual-channel approach
+  with a single typed gRPC channel (unary calls + server streaming).
+version: 1.0.0
+
+environment:
+  sdk: ">=3.0.0 <4.0.0"
+
+dependencies:
+  grpc: ^5.1.0
+  protobuf: ^6.0.0

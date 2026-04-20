@@ -1,0 +1,28 @@
+# ── Python ────────────────────────────────────────────────────────────────────
+python_server/venv/
+python_server/generated/
+python_server/__pycache__/
+**/*.pyc
+**/*.pyo
+
+# ── Dart / Flutter generated ──────────────────────────────────────────────────
+# flutter_demo/packages/grpc_client/lib/src/generated/
+
+# ── Flutter build artifacts ───────────────────────────────────────────────────
+flutter_demo/app/build/
+flutter_demo/app/.dart_tool/
+flutter_demo/app/.flutter-plugins
+flutter_demo/app/.flutter-plugins-dependencies
+flutter_demo/app/.pub-cache/
+flutter_demo/packages/grpc_client/.dart_tool/
+
+# ── app_src (internal scaffold template, not needed by contributors) ──────────
+flutter_demo/app_src/
+
+# ── macOS ─────────────────────────────────────────────────────────────────────
+.DS_Store
+
+# ── IDE ───────────────────────────────────────────────────────────────────────
+.idea/
+.vscode/
+*.iml
