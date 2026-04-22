@@ -42,7 +42,12 @@ class DemoClient {
     _channel = ClientChannel(
       host,
       port: port,
-      options: const ChannelOptions(credentials: ChannelCredentials.insecure()),
+      options: ChannelOptions(
+        credentials: ChannelCredentials.insecure(),
+        // Keep the connection alive to avoid reconnect overhead on every call.
+        idleTimeout: const Duration(minutes: 5),
+        connectionTimeout: const Duration(seconds: 5),
+      ),
     );
     _stub = DemoServiceClient(_channel!);
 

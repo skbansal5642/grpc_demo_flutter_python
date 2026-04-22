@@ -1,6 +1,8 @@
 import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:grpc_client/grpc_client.dart';
+import 'package:grpc_demo_app/benchmark_page.dart';
 
 // Path to the Python server script. In a real app this would be a bundled asset path.
 const _defaultServerPath =
@@ -17,7 +19,7 @@ class GrpcDemoApp extends StatelessWidget {
       title: 'gRPC Demo',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(colorSchemeSeed: Colors.indigo, useMaterial3: true),
-      home: const DemoPage(),
+      home: const _RootTabs(),
     );
   }
 }
@@ -27,7 +29,8 @@ class GrpcDemoApp extends StatelessWidget {
 enum ConnState { idle, starting, connected, disconnecting }
 
 extension on ConnState {
-  bool get isBusy => this == ConnState.starting || this == ConnState.disconnecting;
+  bool get isBusy =>
+      this == ConnState.starting || this == ConnState.disconnecting;
   String get label => switch (this) {
         ConnState.idle => 'Not connected',
         ConnState.starting => 'Starting Python server…',
@@ -170,7 +173,8 @@ class _DemoPageState extends State<DemoPage> {
     final sessionId = 'sess-${DateTime.now().millisecondsSinceEpoch}';
     _log('→ StreamOutput(session=$sessionId, chunks=5)');
     try {
-      await for (final chunk in _client.streamOutput(sessionId, chunkCount: 5)) {
+      await for (final chunk
+          in _client.streamOutput(sessionId, chunkCount: 5)) {
         _log(
           '[${chunk.index}] ${chunk.data}${chunk.isFinal ? "  ← FINAL" : ""}',
           level: chunk.isFinal ? LogLevel.success : LogLevel.info,
@@ -215,7 +219,8 @@ class _DemoPageState extends State<DemoPage> {
                           color: _connState.iconColor,
                         ),
                       )
-                    : Icon(_connState.icon, color: _connState.iconColor, size: 18),
+                    : Icon(_connState.icon,
+                        color: _connState.iconColor, size: 18),
                 const SizedBox(width: 10),
                 Text(
                   _connState.label,
@@ -252,7 +257,8 @@ class _DemoPageState extends State<DemoPage> {
               children: [
                 FilledButton.icon(
                   onPressed: isBusy ? null : _toggleConnect,
-                  icon: Icon(isConnected ? Icons.stop_circle : Icons.play_circle),
+                  icon:
+                      Icon(isConnected ? Icons.stop_circle : Icons.play_circle),
                   label: Text(
                     switch (_connState) {
                       ConnState.idle => 'Start & Connect',
@@ -350,5 +356,40 @@ class _LogEntry {
   final String time;
   final String text;
   final LogLevel level;
-  const _LogEntry({required this.time, required this.text, required this.level});
+  const _LogEntry(
+      {required this.time, required this.text, required this.level});
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// Root tab scaffold
+// ══════════════════════════════════════════════════════════════════════════════
+
+class _RootTabs extends StatefulWidget {
+  const _RootTabs();
+
+  @override
+  State<_RootTabs> createState() => _RootTabsState();
+}
+
+class _RootTabsState extends State<_RootTabs> {
+  int _index = 0;
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: IndexedStack(
+        index: _index,
+        children: const [DemoPage(), BenchmarkPage()],
+      ),
+      bottomNavigationBar: NavigationBar(
+        selectedIndex: _index,
+        onDestinationSelected: (i) => setState(() => _index = i),
+        destinations: const [
+          NavigationDestination(icon: Icon(Icons.wifi), label: 'gRPC Demo'),
+          NavigationDestination(
+              icon: Icon(Icons.speed), label: 'NFR Benchmark'),
+        ],
+      ),
+    );
+  }
 }

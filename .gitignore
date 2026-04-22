@@ -6,7 +6,9 @@ python_server/__pycache__/
 **/*.pyo
 
 # ── Dart / Flutter generated ──────────────────────────────────────────────────
-# flutter_demo/packages/grpc_client/lib/src/generated/
+flutter_demo/packages/grpc_client/lib/src/generated/
+flutter_demo/packages/nfr_benchmark/lib/src/generated/
+flutter_demo/packages/nfr_benchmark/.dart_tool/
 
 # ── Flutter build artifacts ───────────────────────────────────────────────────
 flutter_demo/app/build/

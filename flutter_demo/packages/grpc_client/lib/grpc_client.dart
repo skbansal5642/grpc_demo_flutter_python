@@ -7,4 +7,6 @@
 /// Now exposes a single [DemoClient] backed by one gRPC channel.
 library grpc_client;
 
+export 'src/benchmark_runner.dart';
 export 'src/demo_client.dart';
+export 'src/models.dart';

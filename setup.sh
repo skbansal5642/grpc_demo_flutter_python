@@ -73,6 +73,21 @@ protoc \
   "$SCRIPT_DIR/proto/demo.proto"
 ok "Proto generated → grpc_client/lib/src/generated/"
 
+# ── nfr_benchmark package ────────────────────────────────────────────────────
+banner "nfr_benchmark package"
+
+NFR_DIR="$SCRIPT_DIR/flutter_demo/packages/nfr_benchmark"
+cd "$NFR_DIR"
+$FLUTTER pub get
+ok "nfr_benchmark deps installed"
+
+mkdir -p lib/src/generated
+protoc \
+  --dart_out=grpc:lib/src/generated \
+  -I"$SCRIPT_DIR/proto" \
+  "$SCRIPT_DIR/proto/demo.proto"
+ok "Proto generated → nfr_benchmark/lib/src/generated/"
+
 # ── Flutter app (scaffold if needed) ────────────────────────────────────────
 banner "Flutter app"
 APP_DIR="$SCRIPT_DIR/flutter_demo/app"

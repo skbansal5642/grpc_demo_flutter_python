@@ -1,3 +1,5 @@
 setuptools
 grpcio
 grpcio-tools
+psutil
+websockets
