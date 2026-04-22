@@ -13,8 +13,17 @@ set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 VERSION="${VERSION:-1.0.0}"
-ARCH="amd64"
 PKG_NAME="grpc-demo-app"
+
+# Detect CPU architecture and map to deb + Flutter bundle path names
+_MACHINE="$(uname -m)"
+case "$_MACHINE" in
+  x86_64)           ARCH="amd64";  FLUTTER_ARCH="x64"  ;;
+  aarch64|arm64)    ARCH="arm64";  FLUTTER_ARCH="arm64" ;;
+  armv7l)           ARCH="armhf";  FLUTTER_ARCH="arm"   ;;
+  *)                ARCH="$_MACHINE"; FLUTTER_ARCH="$_MACHINE" ;;
+esac
+
 DEB_STEM="${PKG_NAME}_${VERSION}_${ARCH}"
 OUT_DIR="$SCRIPT_DIR/dist"
 STAGING="$OUT_DIR/$DEB_STEM"
@@ -35,6 +44,7 @@ echo ""
 echo "╔══════════════════════════════════════════╗"
 echo "║   gRPC Demo  ·  Build .deb  v${VERSION}      ║"
 echo "╚══════════════════════════════════════════╝"
+echo "  Host arch : $_MACHINE  →  deb=$ARCH  flutter=$FLUTTER_ARCH"
 
 # ── Pre-flight checks ──────────────────────────────────────────────────────────
 banner "Pre-flight checks"
@@ -55,7 +65,7 @@ command -v dpkg-deb &>/dev/null \
 banner "Building Flutter release (linux)"
 cd "$SCRIPT_DIR/flutter_demo/app"
 $FLUTTER build linux --release
-BUNDLE="$SCRIPT_DIR/flutter_demo/app/build/linux/x64/release/bundle"
+BUNDLE="$SCRIPT_DIR/flutter_demo/app/build/linux/$FLUTTER_ARCH/release/bundle"
 [ -f "$BUNDLE/grpc_demo_app" ] && ok "Flutter bundle ready" || fail "Flutter build failed"
 
 # ── Stage package tree ─────────────────────────────────────────────────────────
@@ -113,11 +123,18 @@ Package: $PKG_NAME
 Version: $VERSION
 Architecture: $ARCH
 Maintainer: Shubham Bansal <shubham.bansal@aarogyatech.com>
-Depends: python3 (>= 3.9), python3-venv, libgtk-3-0, libblkid1, liblzma5
+Depends: python3 (>= 3.9), python3-venv,
+ libgtk-3-0, libglib2.0-0, libpango-1.0-0, libcairo2,
+ libgdk-pixbuf-2.0-0, libatk1.0-0,
+ libegl1, libgles2,
+ libx11-6, libxcomposite1, libxcursor1, libxdamage1,
+ libxext6, libxfixes3, libxi6, libxrandr2, libxrender1,
+ libblkid1, liblzma5
 Description: gRPC Demo Flutter Application
  A Flutter desktop app demonstrating gRPC communication with a Python server.
  Includes an NFR benchmarking tool comparing gRPC vs the old stdio+WebSocket
  architecture, measuring p50/p95/p99 latency and throughput.
+ Built for Raspberry Pi (ARM64) running Debian 12.
 EOF
 ok "DEBIAN/control written"
 
