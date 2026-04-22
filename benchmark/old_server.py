@@ -22,12 +22,14 @@ async def _ws_handler(websocket):
     session = req.get("session_id", "unknown")
 
     for i in range(count):
-        time.sleep(0.03)  # simulate incremental work
+        await asyncio.sleep(0.03)  # non-blocking — keeps event loop free
         await websocket.send(json.dumps({
             "index": i,
             "data": f"Chunk {i + 1}/{count} — session '{session}'",
             "final": i == count - 1,
         }))
+    # Explicitly close so the client receives a clean close frame
+    await websocket.close()
 
 
 def _run_ws_server():

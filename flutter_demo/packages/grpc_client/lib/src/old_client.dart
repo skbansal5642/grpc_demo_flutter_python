@@ -90,11 +90,14 @@ class OldClient {
     channel.sink.add(
       jsonEncode({'session_id': sessionId, 'chunks': chunkCount}),
     );
-    await for (final raw in channel.stream) {
+    // Timeout = (chunks × 100ms) + 2s headroom — prevents an unclean
+    // WebSocket close from freezing the benchmark loop indefinitely.
+    final timeout = Duration(milliseconds: chunkCount * 100 + 2000);
+    await for (final raw in channel.stream.timeout(timeout)) {
       final chunk = jsonDecode(raw as String) as Map<String, dynamic>;
       yield chunk;
       if (chunk['final'] == true) break;
     }
-    await channel.sink.close();
+    await channel.sink.close().catchError((_) {});
   }
 }
