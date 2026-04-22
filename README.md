@@ -45,21 +45,27 @@ The app launches the Python server automatically on connect and kills it on disc
 
 ## Prerequisites
 
-Install these before running setup:
+### macOS
+```bash
+brew install python protobuf
+# Install Flutter: https://flutter.dev/docs/get-started/install/macos
+```
 
-| Tool | Install |
-|---|---|
-| Python 3.9+ | <https://python.org> or `brew install python` |
-| Flutter 3.10+ | <https://flutter.dev/docs/get-started/install> |
-| protoc | `brew install protobuf` |
+### Linux (Ubuntu / Debian)
+```bash
+sudo apt update
+sudo apt install python3 python3-venv python3-pip protobuf-compiler \
+     libgtk-3-dev libblkid-dev liblzma-dev ninja-build cmake pkg-config
+# Install Flutter: https://flutter.dev/docs/get-started/install/linux
+```
 
-> `protoc` is needed by `setup.sh` to generate client code. After setup it is only needed again when `demo.proto` changes.
+> `protoc` is only needed to regenerate client code when `demo.proto` changes.
 
 ---
 
 ## Setup
 
-> **Note:** Generated files are gitignored and not included in the repo. `setup.sh` creates everything from scratch. Run it once after cloning.
+> **Note:** Generated files are gitignored. `setup.sh` creates everything from scratch. Run it once after cloning.
 
 ### 1. Clone
 
@@ -68,7 +74,19 @@ git clone https://github.com/skbansal5642/grpc_demo_flutter_python
 cd grpc_demo
 ```
 
-### 2. Run setup
+### 2. Make Flutter available in PATH
+
+`setup.sh` looks for `flutter` in your `PATH`. Either add it permanently to your shell profile, or pass the location via the `FLUTTER_HOME` variable:
+
+```bash
+# Option A — Flutter already in PATH (recommended)
+export PATH="$PATH:/path/to/flutter/bin"
+
+# Option B — pass it once to setup.sh
+FLUTTER_HOME=/path/to/flutter ./setup.sh
+```
+
+### 3. Run setup
 
 ```bash
 chmod +x setup.sh
@@ -79,23 +97,33 @@ chmod +x setup.sh
 
 | Step | What happens |
 |---|---|
-| Creates `python_server/venv/` | Isolated Python environment |
-| Installs Python deps into venv | `grpcio`, `grpcio-tools` |
+| Creates `python_server/venv/` | Isolated Python environment (avoids system pip restrictions) |
+| Installs Python deps into venv | `grpcio`, `grpcio-tools`, `websockets` |
 | Generates `python_server/generated/` | `demo_pb2.py`, `demo_pb2_grpc.py` from `demo.proto` |
-| Activates `protoc-gen-dart` plugin | Via `dart pub global activate` |
+| Activates `protoc-gen-dart` plugin | Via `dart pub global activate protoc_plugin` |
 | Generates `grpc_client/lib/src/generated/` | `demo.pb.dart`, `demo.pbgrpc.dart` from `demo.proto` |
-| Scaffolds `flutter_demo/app/` | Runs `flutter create` if app doesn't exist |
-| Installs Flutter deps | `flutter pub get` in both package and app |
-| Adds macOS network entitlement | Required for outbound gRPC (HTTP/2) connections |
+| Generates `nfr_benchmark/lib/src/generated/` | Same proto compiled for the benchmark package |
+| Scaffolds `flutter_demo/app/` | Runs `flutter create` with the correct platform(s) if the app doesn't exist |
+| Installs Flutter deps | `flutter pub get` in both packages and the app |
+| *(macOS only)* Adds network entitlement | Required for outbound gRPC (HTTP/2) on macOS sandbox |
 
-### 3. Run the app
+### 4. Run the app
 
+**macOS:**
 ```bash
 cd flutter_demo/app
 flutter run -d macos
 ```
 
-Press **Start & Connect** in the app — it will automatically start the Python gRPC server and connect to it.
+**Linux:**
+```bash
+cd flutter_demo/app
+flutter run -d linux
+```
+
+Press **Start & Connect** in the **gRPC Demo** tab — it automatically starts the Python gRPC server and connects to it.
+
+To run the **NFR Benchmark**, switch to the **NFR Benchmark** tab, set the server path to the absolute path of `python_server/`, and press **Run Benchmark**.
 
 ---
 
