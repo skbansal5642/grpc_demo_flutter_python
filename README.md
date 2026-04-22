@@ -168,6 +168,47 @@ grpc_demo/
 
 ---
 
+## Distributing a .deb Package (Linux)
+
+To share the app as an installable `.deb` for other Linux machines:
+
+### On the build machine (one time)
+```bash
+# 1. Complete setup first (generates all proto + Flutter deps)
+./setup.sh
+
+# 2. Build the .deb
+chmod +x build_deb.sh
+./build_deb.sh
+# → creates dist/grpc-demo-app_1.0.0_amd64.deb
+```
+
+### On the target machine
+```bash
+# Install
+sudo dpkg -i grpc-demo-app_1.0.0_amd64.deb
+sudo apt-get install -f    # resolves any missing system libs
+
+# Run
+grpc-demo-app              # from terminal
+# or launch from the application menu
+```
+
+The `.deb` bundles everything:
+- Flutter Linux binary + all shared libraries
+- Python demo server (`server.py`) and benchmark servers
+- Pre-generated Python proto files
+
+The `postinst` script automatically creates a Python venv and installs `grpcio` / `websockets` on the target — no manual Python setup needed.
+
+To uninstall:
+```bash
+sudo apt remove grpc-demo-app          # remove binaries, keep venv
+sudo apt purge grpc-demo-app           # remove everything including venv
+```
+
+---
+
 ## Regenerating Proto Files
 
 When `demo.proto` changes, regenerate both sides and commit the results:

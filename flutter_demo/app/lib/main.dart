@@ -1,12 +1,17 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:grpc_client/grpc_client.dart';
 import 'package:grpc_demo_app/benchmark_page.dart';
 
-// Path to the Python server script. In a real app this would be a bundled asset path.
-const _defaultServerPath =
-    '/Users/spurge/Documents/claude_workspace/grpc_demo/python_server';
+// Default path to the Python server directory.
+// On a packaged Linux install this is /opt/grpc_demo/python_server.
+// On a dev machine the path field in the UI can be changed at runtime.
+String get _defaultServerPath {
+  if (Platform.isLinux) return '/opt/grpc_demo/python_server';
+  return '/Users/spurge/Documents/claude_workspace/grpc_demo/python_server';
+}
 
 void main() => runApp(const GrpcDemoApp());
 

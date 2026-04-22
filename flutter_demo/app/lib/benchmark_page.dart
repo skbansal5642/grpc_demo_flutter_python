@@ -2,11 +2,15 @@
 // Benchmark Page
 // ══════════════════════════════════════════════════════════════════════════════
 
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:grpc_client/grpc_client.dart';
 
-const _defaultServerPath =
-    '/Users/spurge/Documents/claude_workspace/grpc_demo/python_server';
+String get _defaultServerPath {
+  if (Platform.isLinux) return '/opt/grpc_demo/python_server';
+  return '/Users/spurge/Documents/claude_workspace/grpc_demo/python_server';
+}
 
 class BenchmarkPage extends StatefulWidget {
   const BenchmarkPage({super.key});

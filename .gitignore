@@ -21,6 +21,9 @@ flutter_demo/packages/grpc_client/.dart_tool/
 # ── app_src (internal scaffold template, not needed by contributors) ──────────
 flutter_demo/app_src/
 
+# ── Distribution packages ─────────────────────────────────────────────────────
+dist/
+
 # ── macOS ─────────────────────────────────────────────────────────────────────
 .DS_Store
 
