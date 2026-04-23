@@ -81,6 +81,10 @@ class OldClient {
     final completer = Completer<Map<String, dynamic>>();
     _pending.add(completer);
     _process!.stdin.writeln(jsonEncode({'command': command, 'payload': payload}));
+    // Flush immediately — without this the IOSink buffer may not be sent
+    // to the Python process until it fills, causing readline() to block
+    // indefinitely on slower hardware like CM4.
+    await _process!.stdin.flush();
     return completer.future;
   }
 
