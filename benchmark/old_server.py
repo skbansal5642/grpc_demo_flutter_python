@@ -1,21 +1,19 @@
 """
-Old Implementation Server — single asyncio event loop, no threads.
+Old Implementation Server
 Simulates the previous architecture:
   - Command / ack  → stdin (JSON lines in) / stdout (JSON lines out)
   - Streaming      → WebSocket on port 8765
-
-Previously used threading.Thread for the WebSocket server, which caused GIL
-contention on slower hardware (CM4). Everything now runs in one event loop so
-the WS handler and stdin reader cooperate via coroutines with no locking.
 """
 
-import asyncio
 import sys
 import json
+import time
+import threading
+import asyncio
 import websockets
 
 
-# ── WebSocket handler ─────────────────────────────────────────────────────────
+# ── WebSocket server ──────────────────────────────────────────────────────────
 
 async def _ws_handler(websocket):
     data = await websocket.recv()
@@ -24,7 +22,7 @@ async def _ws_handler(websocket):
     session = req.get("session_id", "unknown")
 
     for i in range(count):
-        await asyncio.sleep(0.03)   # same latency as before, but non-blocking
+        await asyncio.sleep(0.03)   # non-blocking — keeps event loop free
         await websocket.send(json.dumps({
             "index": i,
             "data": f"Chunk {i + 1}/{count} — session '{session}'",
@@ -33,33 +31,31 @@ async def _ws_handler(websocket):
     await websocket.close()
 
 
-# ── Async stdin reader ────────────────────────────────────────────────────────
+def _run_ws_server():
+    async def _main():
+        # Bind to 0.0.0.0 so both IPv4 (127.0.0.1) and IPv6 (::1) clients
+        # connect regardless of how the OS resolves "localhost".
+        async with websockets.serve(_ws_handler, "0.0.0.0", 8765):
+            await asyncio.Future()   # run until cancelled
 
-async def _handle_stdin():
-    """
-    Reads JSON commands from stdin without blocking the event loop.
-    run_in_executor offloads the blocking readline() to a thread-pool thread.
-    That thread releases the GIL while waiting for data, so the asyncio event
-    loop stays free to accept and serve WebSocket connections concurrently.
-    connect_read_pipe was avoided because Python's text-mode sys.stdin does
-    not reliably support non-blocking mode on all ARM Linux kernels.
-    """
-    loop = asyncio.get_event_loop()
-    while True:
-        line = await loop.run_in_executor(None, sys.stdin.readline)
-        if not line:        # EOF — Dart process closed stdin
-            break
-        line = line.strip()
-        if not line:
+    asyncio.run(_main())
+
+
+# ── stdin/stdout command handler ───────────────────────────────────────────────
+
+def _handle_commands():
+    for raw in sys.stdin:
+        raw = raw.strip()
+        if not raw:
             continue
         try:
-            cmd = json.loads(line)
+            cmd = json.loads(raw)
         except json.JSONDecodeError:
             continue
 
         command = cmd.get("command", "")
         payload = cmd.get("payload", "")
-        await asyncio.sleep(0.01)   # simulate work
+        time.sleep(0.01)  # simulate work
 
         if command == "process":
             ack = {"status": "ok", "result": payload.upper()}
@@ -72,16 +68,13 @@ async def _handle_stdin():
         sys.stdout.flush()
 
 
-# ── Entry point ───────────────────────────────────────────────────────────────
-
-async def main():
-    # Bind to 0.0.0.0 so both IPv4 (127.0.0.1) and IPv6 (::1) clients
-    # connect regardless of how the OS resolves "localhost".
-    async with websockets.serve(_ws_handler, "0.0.0.0", 8765):
-        sys.stderr.write("[OldServer] ready\n")
-        sys.stderr.flush()
-        await _handle_stdin()
-
+# ── Entry point ────────────────────────────────────────────────────────────────
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    ws_thread = threading.Thread(target=_run_ws_server, daemon=True)
+    ws_thread.start()
+
+    sys.stderr.write("[OldServer] ready\n")
+    sys.stderr.flush()
+
+    _handle_commands()
