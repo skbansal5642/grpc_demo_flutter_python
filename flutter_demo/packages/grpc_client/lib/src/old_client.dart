@@ -89,13 +89,24 @@ class OldClient {
     String sessionId, {
     int chunkCount = 5,
   }) async* {
-    final channel = WebSocketChannel.connect(Uri.parse('ws://localhost:8765'));
+    // Use 127.0.0.1 explicitly — avoids the ambiguity where "localhost"
+    // resolves to ::1 (IPv6) on the server but 127.0.0.1 (IPv4) on the
+    // client (common on Raspberry Pi / Debian), causing the server to
+    // never receive the request message.
+    final channel = WebSocketChannel.connect(Uri.parse('ws://127.0.0.1:8765'));
+
+    // Wait for the TCP + WebSocket handshake to complete before sending.
+    // Without this, sink.add() fires before the connection is ready and
+    // the message is silently dropped.
+    await channel.ready;
+
     channel.sink.add(
       jsonEncode({'session_id': sessionId, 'chunks': chunkCount}),
     );
-    // Timeout = (chunks × 100ms) + 2s headroom — prevents an unclean
-    // WebSocket close from freezing the benchmark loop indefinitely.
-    final timeout = Duration(milliseconds: chunkCount * 100 + 2000);
+
+    // Timeout per chunk × 3 + 3s headroom.
+    // Each chunk has a 30ms sleep, so 5 chunks = 150ms; 3s is generous.
+    final timeout = Duration(milliseconds: chunkCount * 3 * 30 + 3000);
     await for (final raw in channel.stream.timeout(timeout)) {
       final chunk = jsonDecode(raw as String) as Map<String, dynamic>;
       yield chunk;

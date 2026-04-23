@@ -1,19 +1,21 @@
 """
-Old Implementation Server
+Old Implementation Server — single asyncio event loop, no threads.
 Simulates the previous architecture:
   - Command / ack  → stdin (JSON lines in) / stdout (JSON lines out)
   - Streaming      → WebSocket on port 8765
+
+Previously used threading.Thread for the WebSocket server, which caused GIL
+contention on slower hardware (CM4). Everything now runs in one event loop so
+the WS handler and stdin reader cooperate via coroutines with no locking.
 """
 
+import asyncio
 import sys
 import json
-import time
-import threading
-import asyncio
 import websockets
 
 
-# ── WebSocket server (replaces old WebSocket server) ──────────────────────────
+# ── WebSocket handler ─────────────────────────────────────────────────────────
 
 async def _ws_handler(websocket):
     data = await websocket.recv()
@@ -22,43 +24,39 @@ async def _ws_handler(websocket):
     session = req.get("session_id", "unknown")
 
     for i in range(count):
-        await asyncio.sleep(0.03)  # non-blocking — keeps event loop free
+        await asyncio.sleep(0.03)   # same latency as before, but non-blocking
         await websocket.send(json.dumps({
             "index": i,
             "data": f"Chunk {i + 1}/{count} — session '{session}'",
             "final": i == count - 1,
         }))
-    # Explicitly close so the client receives a clean close frame
     await websocket.close()
 
 
-def _run_ws_server():
-    async def _main():
-        async with websockets.serve(_ws_handler, "localhost", 8765):
-            await asyncio.Future()   # run until cancelled
+# ── Async stdin reader ────────────────────────────────────────────────────────
 
-    asyncio.run(_main())
-
-
-# ── stdin/stdout command handler ───────────────────────────────────────────────
-
-def _handle_commands():
+async def _handle_stdin():
     """
-    Reads JSON-encoded commands from stdin, writes JSON acks to stdout.
-    Mirrors the old flag-based protocol.
+    Reads JSON commands from stdin without blocking the event loop.
+    Uses connect_read_pipe so asyncio can multiplex stdin with WebSocket I/O.
     """
-    for raw in sys.stdin:
-        raw = raw.strip()
-        if not raw:
+    loop = asyncio.get_event_loop()
+    reader = asyncio.StreamReader()
+    protocol = asyncio.StreamReaderProtocol(reader)
+    await loop.connect_read_pipe(lambda: protocol, sys.stdin)
+
+    async for raw in reader:
+        line = raw.decode().strip()
+        if not line:
             continue
         try:
-            cmd = json.loads(raw)
+            cmd = json.loads(line)
         except json.JSONDecodeError:
             continue
 
         command = cmd.get("command", "")
         payload = cmd.get("payload", "")
-        time.sleep(0.01)  # simulate work
+        await asyncio.sleep(0.01)   # simulate work
 
         if command == "process":
             ack = {"status": "ok", "result": payload.upper()}
@@ -71,16 +69,16 @@ def _handle_commands():
         sys.stdout.flush()
 
 
-# ── Entry point ────────────────────────────────────────────────────────────────
+# ── Entry point ───────────────────────────────────────────────────────────────
+
+async def main():
+    # Bind to 0.0.0.0 so both IPv4 (127.0.0.1) and IPv6 (::1) clients
+    # connect regardless of how the OS resolves "localhost".
+    async with websockets.serve(_ws_handler, "0.0.0.0", 8765):
+        sys.stderr.write("[OldServer] ready\n")
+        sys.stderr.flush()
+        await _handle_stdin()
+
 
 if __name__ == "__main__":
-    # Start WebSocket server in a background thread
-    ws_thread = threading.Thread(target=_run_ws_server, daemon=True)
-    ws_thread.start()
-
-    # Signal ready (benchmark runner waits for this line)
-    sys.stderr.write("[OldServer] ready\n")
-    sys.stderr.flush()
-
-    # Block on stdin commands
-    _handle_commands()
+    asyncio.run(main())
