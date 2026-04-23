@@ -38,15 +38,18 @@ async def _ws_handler(websocket):
 async def _handle_stdin():
     """
     Reads JSON commands from stdin without blocking the event loop.
-    Uses connect_read_pipe so asyncio can multiplex stdin with WebSocket I/O.
+    run_in_executor offloads the blocking readline() to a thread-pool thread.
+    That thread releases the GIL while waiting for data, so the asyncio event
+    loop stays free to accept and serve WebSocket connections concurrently.
+    connect_read_pipe was avoided because Python's text-mode sys.stdin does
+    not reliably support non-blocking mode on all ARM Linux kernels.
     """
     loop = asyncio.get_event_loop()
-    reader = asyncio.StreamReader()
-    protocol = asyncio.StreamReaderProtocol(reader)
-    await loop.connect_read_pipe(lambda: protocol, sys.stdin)
-
-    async for raw in reader:
-        line = raw.decode().strip()
+    while True:
+        line = await loop.run_in_executor(None, sys.stdin.readline)
+        if not line:        # EOF — Dart process closed stdin
+            break
+        line = line.strip()
         if not line:
             continue
         try:
