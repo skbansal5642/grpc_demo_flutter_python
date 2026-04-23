@@ -60,6 +60,9 @@ class OldClient {
     });
   }
 
+  /// PID of the spawned Python process — used by [CpuSampler].
+  int get pid => _process!.pid;
+
   Future<void> disconnect() async {
     await _stdoutSub?.cancel();
     _process?.kill(ProcessSignal.sigterm);

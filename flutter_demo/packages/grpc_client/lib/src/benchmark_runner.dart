@@ -1,11 +1,15 @@
+import 'dart:io';
+
 import 'package:grpc_client/src/grpc_bench_client.dart';
 
+import 'cpu_sampler.dart';
 import 'models.dart';
 import 'old_client.dart';
 
 /// Runs both implementations back-to-back and returns a [BenchmarkComparison].
 /// All timings are measured Flutter-side using [Stopwatch] — true round-trip
 /// from Dart sending the request to Dart receiving the response.
+/// CPU usage is sampled from /proc/{pid}/stat on Linux (zero on other platforms).
 class BenchmarkRunner {
   final int nCommand; // number of command/ack iterations
   final int nStream; // number of streaming iterations
@@ -27,9 +31,16 @@ class BenchmarkRunner {
 
   /// [serverDirectory] = absolute path to python_server/
   Future<BenchmarkComparison> run({required String serverDirectory}) async {
+    if (!Platform.isLinux) {
+      _log('ℹ️  CPU sampling is Linux-only — will show N/A on this platform.');
+    }
     final oldResult = await _runOld(serverDirectory);
     final grpcResult = await _runGrpc(serverDirectory);
-    return BenchmarkComparison(old: oldResult, grpc: grpcResult);
+    return BenchmarkComparison(
+      old: oldResult,
+      grpc: grpcResult,
+      cpuAvailable: Platform.isLinux,
+    );
   }
 
   // ── Old implementation ─────────────────────────────────────────────────────
@@ -47,6 +58,8 @@ class BenchmarkRunner {
 
     // Command round-trips
     _log('Old — measuring $nCommand command round-trips…');
+    final cmdSampler = CpuSampler(pid: client.pid);
+    await cmdSampler.start();
     final cmdMs = <double>[];
     final cmdStart = Stopwatch()..start();
     for (var i = 0; i < nCommand; i++) {
@@ -55,18 +68,21 @@ class BenchmarkRunner {
       cmdMs.add(t.elapsedMicroseconds / 1000.0);
     }
     final cmdElapsed = cmdStart.elapsedMicroseconds / 1e6;
+    final cmdCpu = cmdSampler.stop();
 
     // Stream round-trips
     _log('Old — measuring $nStream stream round-trips ($chunks chunks each)…');
+    final strSampler = CpuSampler(pid: client.pid);
+    await strSampler.start();
     final strMs = <double>[];
     final strStart = Stopwatch()..start();
     for (var i = 0; i < nStream; i++) {
       final t = Stopwatch()..start();
-      await for (final _
-          in client.streamOutput('bench-$i', chunkCount: chunks)) {}
+      await for (final _ in client.streamOutput('bench-$i', chunkCount: chunks)) {}
       strMs.add(t.elapsedMicroseconds / 1000.0);
     }
     final strElapsed = strStart.elapsedMicroseconds / 1e6;
+    final strCpu = strSampler.stop();
 
     await client.disconnect();
     _log('Old server stopped.');
@@ -75,8 +91,12 @@ class BenchmarkRunner {
       name: 'Old (stdio + WebSocket)',
       cmdMs: cmdMs,
       cmdElapsed: cmdElapsed,
+      cmdCpuAvg: cmdCpu.avgPercent,
+      cmdCpuPeak: cmdCpu.peakPercent,
       strMs: strMs,
       strElapsed: strElapsed,
+      strCpuAvg: strCpu.avgPercent,
+      strCpuPeak: strCpu.peakPercent,
     );
   }
 
@@ -95,6 +115,8 @@ class BenchmarkRunner {
 
     // Command round-trips
     _log('gRPC — measuring $nCommand command round-trips…');
+    final cmdSampler = CpuSampler(pid: client.pid);
+    await cmdSampler.start();
     final cmdMs = <double>[];
     final cmdStart = Stopwatch()..start();
     for (var i = 0; i < nCommand; i++) {
@@ -103,18 +125,21 @@ class BenchmarkRunner {
       cmdMs.add(t.elapsedMicroseconds / 1000.0);
     }
     final cmdElapsed = cmdStart.elapsedMicroseconds / 1e6;
+    final cmdCpu = cmdSampler.stop();
 
     // Stream round-trips
     _log('gRPC — measuring $nStream stream round-trips ($chunks chunks each)…');
+    final strSampler = CpuSampler(pid: client.pid);
+    await strSampler.start();
     final strMs = <double>[];
     final strStart = Stopwatch()..start();
     for (var i = 0; i < nStream; i++) {
       final t = Stopwatch()..start();
-      await for (final _
-          in client.streamOutput('bench-$i', chunkCount: chunks)) {}
+      await for (final _ in client.streamOutput('bench-$i', chunkCount: chunks)) {}
       strMs.add(t.elapsedMicroseconds / 1000.0);
     }
     final strElapsed = strStart.elapsedMicroseconds / 1e6;
+    final strCpu = strSampler.stop();
 
     await client.disconnect();
     _log('gRPC server stopped.');
@@ -123,8 +148,12 @@ class BenchmarkRunner {
       name: 'New (gRPC)',
       cmdMs: cmdMs,
       cmdElapsed: cmdElapsed,
+      cmdCpuAvg: cmdCpu.avgPercent,
+      cmdCpuPeak: cmdCpu.peakPercent,
       strMs: strMs,
       strElapsed: strElapsed,
+      strCpuAvg: strCpu.avgPercent,
+      strCpuPeak: strCpu.peakPercent,
     );
   }
 
@@ -134,8 +163,12 @@ class BenchmarkRunner {
     required String name,
     required List<double> cmdMs,
     required double cmdElapsed,
+    required double cmdCpuAvg,
+    required double cmdCpuPeak,
     required List<double> strMs,
     required double strElapsed,
+    required double strCpuAvg,
+    required double strCpuPeak,
   }) {
     cmdMs.sort();
     strMs.sort();
@@ -145,10 +178,14 @@ class BenchmarkRunner {
       cmdP95: _p(cmdMs, 95),
       cmdP99: _p(cmdMs, 99),
       cmdRps: nCommand / cmdElapsed,
+      cmdCpuAvg: cmdCpuAvg,
+      cmdCpuPeak: cmdCpuPeak,
       strP50: _p(strMs, 50),
       strP95: _p(strMs, 95),
       strP99: _p(strMs, 99),
       strRps: nStream / strElapsed,
+      strCpuAvg: strCpuAvg,
+      strCpuPeak: strCpuPeak,
     );
   }
 

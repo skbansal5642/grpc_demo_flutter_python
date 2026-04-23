@@ -59,6 +59,9 @@ class GrpcBenchClient {
     throw TimeoutException('gRPC server did not become ready');
   }
 
+  /// PID of the spawned Python process — used by [CpuSampler].
+  int get pid => _serverProcess!.pid;
+
   Future<void> disconnect() async {
     await _channel?.shutdown();
     _channel = null;

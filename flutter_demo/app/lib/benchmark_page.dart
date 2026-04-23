@@ -170,12 +170,26 @@ class _ResultsTable extends StatelessWidget {
             _metricRow('Latency p99', old.cmdP99, grpc.cmdP99, 'ms'),
             _metricRow('Throughput', old.cmdRps, grpc.cmdRps, 'rps',
                 higherIsBetter: true),
+            if (comparison.cpuAvailable) ...[
+              _metricRow('CPU avg', old.cmdCpuAvg, grpc.cmdCpuAvg, '%'),
+              _metricRow('CPU peak', old.cmdCpuPeak, grpc.cmdCpuPeak, '%'),
+            ] else ...[
+              _naRow('CPU avg'),
+              _naRow('CPU peak'),
+            ],
             _sectionRow('Streaming'),
             _metricRow('Latency p50', old.strP50, grpc.strP50, 'ms'),
             _metricRow('Latency p95', old.strP95, grpc.strP95, 'ms'),
             _metricRow('Latency p99', old.strP99, grpc.strP99, 'ms'),
             _metricRow('Throughput', old.strRps, grpc.strRps, 'rps',
                 higherIsBetter: true),
+            if (comparison.cpuAvailable) ...[
+              _metricRow('CPU avg', old.strCpuAvg, grpc.strCpuAvg, '%'),
+              _metricRow('CPU peak', old.strCpuPeak, grpc.strCpuPeak, '%'),
+            ] else ...[
+              _naRow('CPU avg'),
+              _naRow('CPU peak'),
+            ],
           ],
         ),
       ),
@@ -198,6 +212,13 @@ class _ResultsTable extends StatelessWidget {
           _cell(''),
         ],
       );
+
+  TableRow _naRow(String label) => TableRow(children: [
+        _cell(label),
+        _cell('N/A', color: Colors.grey),
+        _cell('N/A', color: Colors.grey),
+        _cell('Linux only', color: Colors.grey),
+      ]);
 
   TableRow _metricRow(String label, double oldVal, double grpcVal, String unit,
       {bool higherIsBetter = false}) {
